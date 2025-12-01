@@ -1,5 +1,6 @@
 import logging
 
+import httpx
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler
 
 from app.enums import Month
@@ -25,7 +26,7 @@ def _is_allowed(_from) -> bool:
         return True
 
     user = User(
-        id=_from.id, name=f"{_from.first_name} {_from.last_name}", is_allowed=False
+        id=_from.id, username=f"{_from.first_name} {_from.last_name}", is_allowed=False
     )
     service.create_user(user)
     return False
@@ -124,7 +125,10 @@ async def recurring_task_cmd(update, ctx):
     if _is_allowed(update.message.from_user):
         try:
             service = get_recurring_task_service()
-            await update.message.reply_text("Recurring task command received.")
+            command, *_input = ctx.args
+            user_id = update.message.from_user.id
+            keyboard = None
+            response = ""
         except Exception as exc:
             logger.error(f"Error in recurring task command: {exc}")
             await update.message.reply_text("Error in recurring task command.")
@@ -142,17 +146,7 @@ async def on_callback(update, ctx):
     if _is_allowed(update.callback_query.from_user):
         try:
             if update.callback_query.data.startswith("shop:"):
-                service = get_shopping_item_service()
-                item_id = int(update.callback_query.data.split(":")[1])
-                await ctx.bot.delete_message(
-                    chat_id=update.callback_query.message.chat_id,
-                    message_id=update.callback_query.message.message_id,
-                )
-                service.remove_shopping_item(item_id)
-                response, keyboard = service.get_shopping_items()
-                await update.callback_query.message.reply_text(
-                    response, parse_mode="HTML", reply_markup=keyboard
-                )
+                await handle_shopping_item_callback(update, ctx)
         except Exception as exc:
             logger.error(f"Error processing callback query: {exc}")
 
@@ -174,6 +168,21 @@ async def handle_shopping_item_callback(update, ctx):
         logger.error(f"Error processing shopping item callback: {exc}")
 
 
+# async def send_message():
+#     TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
+#     BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+
+#     url = f"{BASE_URL}/sendMessage"
+#     payload = {
+#         "chat_id": "CHAT_ID",
+#         "text": "Hi! This is a scheduled message from your bot.",
+#     }
+
+#     async with httpx.AsyncClient() as client:
+#         resp = await client.post(url, json=payload)
+#         resp.raise_for_status()
+
+
 def build_bot():
     app = (
         ApplicationBuilder().token(settings.BOT_TOKEN).concurrent_updates(True).build()
@@ -183,5 +192,6 @@ def build_bot():
     app.add_handler(CommandHandler("appointment", appointment_cmd))
     app.add_handler(CommandHandler("shop", shop_cmd))
     app.add_handler(CallbackQueryHandler(on_callback))
+    app.add_handler(CommandHandler("task", recurring_task_cmd))
 
     return app

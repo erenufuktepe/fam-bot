@@ -7,6 +7,10 @@ from sqlalchemy.orm import Session
 from app.models.appointment import Appointment
 
 
+class AppointmentRepositoryException(Exception):
+    pass
+
+
 class AppointmentRepository:
     def __init__(self, session: Session):
         self.session = session
@@ -15,18 +19,20 @@ class AppointmentRepository:
         today_ct = datetime.now(ZoneInfo("America/Chicago")).date()
         appointments = (
             self.session.query(Appointment)
-            .filter(Appointment.user_id == user_id, Appointment.start_at >= today_ct)
-            .order_by(Appointment.start_at.asc())
+            .filter(
+                Appointment.user_id == user_id, Appointment.start_datetime >= today_ct
+            )
+            .order_by(Appointment.start_datetime.asc())
             .all()
         )
         return appointments
 
     def get_appointments_by_date(
-        self, user_id: int, start_at: datetime
+        self, user_id: int, start_datetime: datetime
     ) -> Optional[list[Appointment]]:
         appointments = (
             self.session.query(Appointment)
-            .filter(Appointment.start_at == start_at)
+            .filter(Appointment.start_datetime == start_datetime)
             .all()
         )
         return appointments

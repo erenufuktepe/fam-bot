@@ -1,8 +1,8 @@
 from .appointment import Appointment
 from .base import Base
 from .birthday import Birthday
-from .recurring_tasks import RecurringTask
 from .shopping_item import ShoppingItem
+from .task import Task
 from .user import User
 
 __all__ = [
@@ -11,5 +11,5 @@ __all__ = [
     "Appointment",
     "Birthday",
     "ShoppingItem",
-    "RecurringTask",
+    "Task",
 ]

@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 from app.models import Birthday
 
 
+class BirthdayRepositoryException(Exception):
+    pass
+
+
 class BirthdayRepository:
     def __init__(self, session: Session):
         self.session = session

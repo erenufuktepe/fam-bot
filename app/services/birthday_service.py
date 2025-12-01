@@ -2,9 +2,9 @@ import logging
 
 from sqlalchemy.exc import IntegrityError
 
-from app.converters.birthday_converter import BirthdayConverter
 from app.db import session_scope
 from app.enums import Month
+from app.model_mapper import ModelMapper
 from app.repositories.birthday_repository import BirthdayRepository
 from app.schemas.birthday import Birthday
 
@@ -18,14 +18,14 @@ class BirthdayServiceIntegrityException(Exception): ...
 class BirthdayService:
 
     def __init__(self):
-        self.converter = BirthdayConverter()
+        pass
 
     def get_birthday_by_month(self, month: int) -> list[Birthday]:
         try:
             with session_scope() as session:
                 repository = BirthdayRepository(session)
                 birthdays = repository.get_by_month(month)
-                return self.converter.from_model_list(birthdays)
+                return ModelMapper.from_model_list(birthdays, Birthday)
         except Exception as exc:
             raise BirthdayServiceExpection(
                 f"Error getting birthday for {Month.from_number(month)}: {exc}"
@@ -35,7 +35,7 @@ class BirthdayService:
         try:
             with session_scope() as session:
                 repository = BirthdayRepository(session)
-                _birthday = self.converter.from_schema(birthday)
+                _birthday = ModelMapper.from_schema(birthday, Birthday)
                 return repository.add_birthday(_birthday)
         except IntegrityError as exc:
             raise BirthdayServiceIntegrityException(

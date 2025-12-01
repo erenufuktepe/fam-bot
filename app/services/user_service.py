@@ -1,9 +1,10 @@
 import logging
 
-from app.converters.user_converter import UserConverter
 from app.db import session_scope
+from app.model_mapper import ModelMapper
+from app.models.user import User as UserModel
 from app.repositories.user_repository import UserRepository
-from app.schemas.user import User
+from app.schemas.user import User as UserSchema
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ class UserServiceException(Exception):
 
 
 class UserService:
-    def get_by_id(self, id: int) -> User:
+    def get_by_id(self, id: int) -> UserSchema | None:
         try:
             with session_scope() as session:
                 repository = UserRepository(session)
@@ -21,17 +22,17 @@ class UserService:
             if not user:
                 logger.info(f"User with id {id} not found.")
                 return None
-            return UserConverter.from_model(user)
+            return ModelMapper.from_model(user, UserSchema)
         except Exception as exc:
             raise UserServiceException(f"Error getting the {id}: {exc}")
 
-    def create_user(self, user: User) -> bool:
+    def create_user(self, user: UserSchema) -> bool:
         try:
             with session_scope() as session:
                 repository = UserRepository(session)
                 if repository.get_by_id(user.id):
                     raise UserServiceException(f"User already exists.")
-                _user = UserConverter.from_schema(user)
+                _user = ModelMapper.from_schema(user, UserModel)
                 repository.add_user(_user)
                 return True
         except Exception as exc:

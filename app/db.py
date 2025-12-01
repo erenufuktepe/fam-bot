@@ -7,24 +7,15 @@ from app.settings import settings
 
 engine = create_engine(
     settings.DATABASE_URL,
-    connect_args=(
-        {"check_same_thread": False}
-        if settings.DATABASE_URL.startswith("sqlite")
-        else {}
-    ),
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=5,
+    pool_recycle=1800,
 )
+
 SessionLocal = sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
 )
-
-if settings.DATABASE_URL.startswith("sqlite"):
-
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA journal_mode=WAL;")
-        cur.execute("PRAGMA foreign_keys=ON;")
-        cur.close()
 
 
 @contextmanager

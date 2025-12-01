@@ -1,7 +1,7 @@
 import shlex
 
-from app.converters.appointment_converter import AppointmentConverter
 from app.db import session_scope
+from app.model_mapper import ModelMapper
 from app.repositories.appointment_repository import AppointmentRepository
 from app.schemas.appointment import Appointment
 from app.utils import CLIParser
@@ -11,7 +11,6 @@ MAPPING = {"-t": "title", "-d": "start_at", "-l": "location", "-n": "notes"}
 
 class AppointmentService:
     def __init__(self):
-        self.converter = AppointmentConverter()
         self.parser = CLIParser(
             mapping=MAPPING,
             cls=Appointment,
@@ -24,7 +23,7 @@ class AppointmentService:
                 appointment = self.parser.parse(tokens)
                 appointment.user_id = user_id
                 repository = AppointmentRepository(session)
-                _appointment = self.converter.from_schema(appointment)
+                _appointment = ModelMapper.from_schema(appointment, Appointment)
                 return self._present_added_appointment(
                     repository.add_appointment(_appointment)
                 )
@@ -37,7 +36,7 @@ class AppointmentService:
                 repository = AppointmentRepository(session)
                 appointments = repository.get_by_user_id(user_id)
                 return self._present_appointments(
-                    self.converter.from_model_list(appointments)
+                    ModelMapper.from_model_list(appointments, Appointment)
                 )
         except Exception as exc:
             raise Exception(f"Error getting appointments for user {user_id}: {exc}")

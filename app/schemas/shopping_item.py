@@ -7,10 +7,10 @@ from pydantic import BaseModel, Field
 class ShoppingItem(BaseModel):
     id: int = Field(None, description="Shopping item ID")
     user_id: int = Field(None, description="Telegram user id")
-    name: str = Field(..., description="Shopping item name")
+    item_name: str = Field(..., description="Shopping item name")
     quantity: int = Field(..., description="Shopping item quantity")
-    notes: str = Field(..., description="Shopping item notes")
-    created_at: datetime = Field(
+    note: str = Field(..., description="Shopping item notes")
+    created_datetime: datetime = Field(
         datetime.now(ZoneInfo("America/Chicago")),
-        description="Shopping item created at",
+        description="Shopping item created datetime",
     )

@@ -1,7 +1,7 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.converters.shopping_item_converter import ShoppingItemConverter
 from app.db import session_scope
+from app.model_mapper import ModelMapper
 from app.repositories.shopping_item_repository import ShoppingItemRepository
 from app.schemas.shopping_item import ShoppingItem
 from app.utils import CLIParser
@@ -11,7 +11,6 @@ MAPPING = {"-i": "name", "-q": "quantity", "-n": "notes"}
 
 class ShoppingItemService:
     def __init__(self):
-        self.converter = ShoppingItemConverter()
         self.parser = CLIParser(
             mapping=MAPPING,
             cls=ShoppingItem,
@@ -23,7 +22,7 @@ class ShoppingItemService:
                 repository = ShoppingItemRepository(session)
                 item = self.parser.parse(tokens)
                 item.user_id = user_id
-                _item = self.converter.from_schema(item)
+                _item = ModelMapper.from_schema(item, ShoppingItem)
                 return self._present_added_item(repository.add_shopping_item(_item))
         except Exception as exc:
             raise Exception(f"Error creating shopping item: {exc}")
@@ -34,7 +33,7 @@ class ShoppingItemService:
                 repository = ShoppingItemRepository(session)
                 models = repository.get_all_items()
                 return self._present_shopping_items(
-                    self.converter.from_model_list(models)
+                    ModelMapper.from_model_list(models, ShoppingItem)
                 )
         except Exception as exc:
             raise Exception(f"Error fetching shopping items: {exc}")

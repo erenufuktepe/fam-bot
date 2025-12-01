@@ -5,6 +5,10 @@ from sqlalchemy.orm import Session
 from app.models.shopping_item import ShoppingItem
 
 
+class ShoppingItemRepositoryException(Exception):
+    pass
+
+
 class ShoppingItemRepository:
     def __init__(self, session: Session):
         self.session = session
@@ -23,10 +27,8 @@ class ShoppingItemRepository:
         items = self.session.query(ShoppingItem).all()
         return items
 
-    def delete_by_id(self, item_id: int) -> None:
-        item = (
-            self.session.query(ShoppingItem).filter(ShoppingItem.id == item_id).first()
-        )
+    def delete_by_id(self, id: int) -> None:
+        item = self.session.query(ShoppingItem).filter(ShoppingItem.id == id).first()
         if item:
             self.session.delete(item)
             self.session.commit()

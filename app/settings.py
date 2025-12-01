@@ -10,9 +10,7 @@ class Settings(BaseSettings):
     BOT_TOKEN: str
     ALLOWED_USER_IDS: list[int]
     TZ: str = "America/Chicago"
-    DATABASE_URL: str = (
-        f"sqlite:///{(BASE_DIR / 'app' / 'data' / 'fambot.db').as_posix()}"
-    )
+    DATABASE_URL: str
     WEBHOOK_URL: str
     WEBHOOK_SECRET: str
     DEBUG: bool = False
