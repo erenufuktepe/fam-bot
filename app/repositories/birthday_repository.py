@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models import Birthday
@@ -15,8 +16,21 @@ class BirthdayRepository:
         birthday = self.session.query(Birthday).filter(Birthday.month == month)
         return birthday.all()
 
-    def add_birthday(self, birthday: Birthday) -> bool:
+    def get_by_name(self, person_name) -> Birthday:
+        birthday = self.session.query(Birthday).filter(
+            func.lower(Birthday.person_name) == person_name
+        )
+        return birthday.first()
+
+    def add(self, birthday: Birthday) -> bool:
         self.session.add(birthday)
         self.session.commit()
-        self.session.refresh(birthday)
-        return birthday
+        return True
+
+    def delete(self, person_name: str) -> bool:
+        birthday = self.get_by_name(person_name)
+        if not birthday:
+            return False
+        self.session.delete(birthday)
+        self.session.commit()
+        return True

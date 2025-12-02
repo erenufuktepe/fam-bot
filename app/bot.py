@@ -1,7 +1,17 @@
 import logging
+from datetime import datetime
 
 import httpx
-from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
 from app.enums import Month
 from app.schemas.birthday import Birthday
@@ -18,6 +28,8 @@ from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
+BDAY_MENU, ASKING = range(2)
+
 
 def _is_allowed(_from) -> bool:
     service = get_user_service()
@@ -32,40 +44,111 @@ def _is_allowed(_from) -> bool:
     return False
 
 
-async def start_cmd(update, ctx):
-    if _is_allowed(update.message.from_user):
-        await update.message.reply_text("Hi! Webhook mode is live.")
+def create_inline_keyboard_button(
+    text: str, callback_data: str
+) -> list[InlineKeyboardButton]:
+    """Helper function to create an inline keyboard button."""
+    return [InlineKeyboardButton(text=text, callback_data=callback_data)]
 
 
-async def birthday_cmd(update, ctx):
+async def reply_with_options(
+    update: Update, ctx: ContextTypes.DEFAULT_TYPE, buttons_list: dict
+) -> None:
+    """Helper function to reply with inline keyboard options."""
+    keyboard = [
+        create_inline_keyboard_button(text, callback_data)
+        for text, callback_data in buttons_list.items()
+    ]
+    await update.message.reply_text(
+        "<b>What would you like to do?</b>",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def birthday_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle the /birthday command."""
     if _is_allowed(update.message.from_user):
-        try:
+        buttons_list = {
+            "Add new birthday to calendar. 🎂": "birthday:add",
+            "Delete birthday from calendar. ❌": "birthday:delete",
+            "List this month's birthdays from calendar.🗓️": "birthday:list",
+        }
+        await reply_with_options(update, ctx, buttons_list)
+        return BDAY_MENU
+
+
+async def handle_birthday_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle birthday related button presses."""
+    query = update.callback_query
+    await query.answer()
+
+    action = query.data.split(":", 1)[1]
+
+    match action:
+        case "add":
+            await query.edit_message_text("You chose: Add birthday 🎂")
+            ctx.user_data["step"] = "person_name"
+            await query.message.reply_text("Who is the birthday for?")
+            return ASKING
+        case "delete":
+            await query.edit_message_text("You chose: Delete birthday ❌")
+            ctx.user_data["step"] = "delete"
+            await query.message.reply_text("Who is the birthday do you want to delete?")
+            return ASKING
+        case "list":
+            month = datetime.now().month
+            await query.edit_message_text("You chose: List birthdays 🗓️")
+            await query.message.reply_text(
+                f"<b>{Month.from_number(month).title()} Birthdays</b>",
+                parse_mode="HTML",
+            )
             service = get_birthday_service()
-            name, day, month = ctx.args
-            day, month = int(day), int(month)
-            name = name.replace("-", " ").title()
+            birthdays = await service.get_upcoming_birthdays()
 
-            if day < 1 and day > 31:
-                raise ValueError(f"Invlaid day: {day}")
-
-            if month < 1 and month > 12:
-                raise ValueError(f"Invalid month: {month}")
-
-            birthday = Birthday(
-                id=None, person_name=name, month=Month.from_number(month), day=day
+            message = "No birthdays found for this month."
+            if birthdays:
+                message_list = [
+                    f"🔵 {birthday.person_name} - {str(birthday.month).zfill(2)}/{str(birthday.day).zfill(2)}"
+                    for birthday in birthdays
+                ]
+                message = "\n".join(message_list)
+            await query.message.reply_text(
+                message,
+                parse_mode="HTML",
             )
-            service.add_birthday(birthday)
-            await update.message.reply_text(f"{name}'s birthday added! 🎉")
-        except BirthdayServiceIntegrityException as exc:
-            await update.message.reply_text(f"We already have {name}'s birthday. 😎")
-        except Exception as exc:
-            logger.error(f"Error adding birthday: {exc}")
+            return ConversationHandler.END
+
+
+async def handle_birthday_chat(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    step = ctx.user_data.get("step")
+    text = update.message.text
+    user_id = update.message.from_user.id
+
+    match step:
+        case "person_name":
+            ctx.user_data["person_name"] = text.title()
+            ctx.user_data["step"] = "date"
+            await update.message.reply_text("Enter the date (MM/DD):")
+            return ASKING
+        case "date":
+            person_name = ctx.user_data["person_name"]
+            date = text
+            service = get_birthday_service()
+            await service.add_birthday(user_id, person_name, date)
             await update.message.reply_text(
-                f"/birthday <first_name>-<last_name> <day_in_number> <month_in_number>"
+                f"Saved birthday for {person_name} on {date}. 🎉"
             )
+            return ConversationHandler.END
+        case "delete":
+            person_name = text.title()
+            service = get_birthday_service()
+            await service.delete_birthday(person_name)
+            await update.message.reply_text(f"{person_name}'s birthday is deleted.")
+            return ConversationHandler.END
 
 
-async def appointment_cmd(update, ctx):
+async def appointment_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if _is_allowed(update.message.from_user):
         try:
             service = get_appointment_service()
@@ -183,15 +266,55 @@ async def handle_shopping_item_callback(update, ctx):
 #         resp.raise_for_status()
 
 
+ASK_NAME = 0  # state id
+
+
+# 1) MUST return ASK_NAME from the entry point
+async def start_cmd(update, context) -> int:
+    await update.message.reply_text("Hi! What is your name?")
+    return ASK_NAME
+
+
+# 2) This will be called when we are in ASK_NAME state
+async def get_name(update, context) -> int:
+    name = update.message.text
+    await update.message.reply_text(f"Nice to meet you, {name}!")
+    return ConversationHandler.END  # or another state
+
+
 def build_bot():
     app = (
         ApplicationBuilder().token(settings.BOT_TOKEN).concurrent_updates(True).build()
     )
-    app.add_handler(CommandHandler("start", start_cmd))
-    app.add_handler(CommandHandler("birthday", birthday_cmd))
+    # app.add_handler(CommandHandler("birthday", birthday_cmd))
     app.add_handler(CommandHandler("appointment", appointment_cmd))
     app.add_handler(CommandHandler("shop", shop_cmd))
-    app.add_handler(CallbackQueryHandler(on_callback))
+    # app.add_handler(CallbackQueryHandler(on_callback))
     app.add_handler(CommandHandler("task", recurring_task_cmd))
+
+    # conv_handler = ConversationHandler(
+    #     entry_points=[CommandHandler("start", start_cmd)],
+    #     states={ASK_NAME: [MessageHandler(filters.TEXT, get_name)]},
+    #     fallbacks=[],
+    # )
+    # app.add_handler(conv_handler)
+
+    conv = ConversationHandler(
+        entry_points=[CommandHandler("birthday", birthday_cmd)],
+        states={
+            BDAY_MENU: [
+                CallbackQueryHandler(handle_birthday_button, pattern=r"^birthday:")
+            ],
+            ASKING: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    handle_birthday_chat,
+                )
+            ],
+        },
+        fallbacks=[],
+    )
+
+    app.add_handler(conv)
 
     return app
