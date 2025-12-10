@@ -53,3 +53,6 @@ DROP TABLE IF EXISTS fambot.birthdays;
 DROP TABLE IF EXISTS fambot.tasks;
 DROP TABLE IF EXISTS fambot.shopping_items; 
 DROP TABLE IF EXISTS fambot.users;
+
+
+SELECT * FROM appointments

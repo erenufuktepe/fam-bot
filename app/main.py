@@ -10,8 +10,6 @@ from app.bot import build_bot
 from app.db import SessionLocal, engine
 from app.models import Base
 from app.scheduler import scheduler, shutdown_scheduler, start_scheduler
-from app.schemas.user import User
-from app.services.user_service import UserService, get_user_service
 from app.settings import settings
 
 logger = logging.getLogger(__name__)

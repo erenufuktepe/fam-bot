@@ -1,12 +1,14 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
-class Appointment(BaseModel):
+class AppointmentDTO(BaseModel):
     id: int = Field(None, description="Appointment ID")
-    user_id: int = Field(None, description="Telegram user id")
+    user_id: int = Field(..., description="Telegram user id")
     title: str = Field(..., description="Appointment title")
-    start_datetime: str = Field(
+    start_datetime: datetime = Field(
         ..., description="Appointment start date and time in ISO 8601 format"
     )
-    location: str = Field(..., description="Appointment location")
-    note: str = Field(..., description="Appointment notes")
+    location: str | None = Field(None, description="Appointment location")
+    note: str | None = Field(None, description="Appointment notes")

@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class Task(BaseModel):
+class TaskDTO(BaseModel):
     id: int = Field(None, description="Task ID")
     user_id: int = Field(..., description="Telegram user id")
     chat_id: int = Field(..., description="Telegram chat id")
