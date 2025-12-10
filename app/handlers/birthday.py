@@ -11,10 +11,8 @@ from app.utils import datetime, formatting, telegram
 BDAY_MENU, ASKING = range(2)
 
 
-NEXT_STEP = {"person_name": "date", "date": None, "delete": None}
-
-
 async def birthday_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    ctx.user_data["user_id"] = update.message.from_user.id
     buttons_list = {
         "Add new birthday to calendar. 🎂": "birthday:add",
         "Delete birthday from calendar. ❌": "birthday:delete",
@@ -73,7 +71,7 @@ async def handle_birthday_steps(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     match step:
         case "person_name":
             ctx.user_data["person_name"] = text.title()
-            ctx.user_data["step"] = NEXT_STEP[step]
+            ctx.user_data["step"] = "date"
             await update.message.reply_text("Enter the date (MM/DD):")
             return ASKING
         case "date":
