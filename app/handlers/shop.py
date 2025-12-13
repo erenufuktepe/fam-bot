@@ -1,4 +1,4 @@
-from telegram import Update
+from telegram import CallbackQuery, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from app.db import session_scope
@@ -34,33 +34,62 @@ async def handle_shop_cmd_action(update: Update, ctx: ContextTypes.DEFAULT_TYPE)
             await query.edit_message_text("What is the name of the item?")
             return ASKING
         case "list":
-            message = formatting.bold("Grocery List:")
-            await query.edit_message_text(message, parse_mode="HTML")
+            return await handle_shopping_list(update, ctx)
 
+
+async def handle_shop_list_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    action = query.data.split(":", 1)[1]
+
+    if action.__contains__(":"):
+        action, id = action.split(":")
+
+    match action:
+        case "delete":
             with session_scope() as session:
                 repository = ShoppingItemRepository(session)
                 service = ShoppingItemService(repository)
-                items = service.get_shopping_items()
+                service.delete(id)
+            return await handle_shopping_list(update, ctx)
+        case "complete":
+            await query.message.delete()
+            return ConversationHandler.END
 
-            if not items:
-                message = "No grocery item found."
-                await query.message.reply_text(message, parse_mode="HTML")
-                return ConversationHandler.END
 
-            buttons_list = format_grocery_list(items)
-            title = "Select items to delete or complete to close."
-            await telegram.message_reply_with_buttons(
-                update, ctx, options=buttons_list, title=title
-            )
-            return ASKING
+async def handle_shopping_list(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    message = formatting.bold("Grocery List:")
+    await query.edit_message_text(message, parse_mode="HTML")
+
+    with session_scope() as session:
+        repository = ShoppingItemRepository(session)
+        service = ShoppingItemService(repository)
+        items = service.get_shopping_items()
+
+    if not items:
+        message = "No grocery item found."
+        await query.message.reply_text(message, parse_mode="HTML")
+        return ConversationHandler.END
+
+    buttons_list = format_grocery_list(items)
+    title = "Select items to delete or complete to close."
+
+    for item in items:
+        if item.note:
+            title += f"\n🔵 {item.item_name} - {item.note}"
+
+    await telegram.message_reply_with_buttons(
+        update, ctx, options=buttons_list, title=title
+    )
+    return ASKING
 
 
 def format_grocery_list(items: list[ShoppingItemDTO]) -> dict[str, str]:
     buttons_list = {}
     for obj in items:
         key = f"🛒 {obj.item_name} - {obj.quantity}"
-        if obj.note:
-            key += f"\n{obj.note}"
         buttons_list[key] = f"shop:delete:{obj.id}"
     buttons_list["Complete"] = "shop:complete"
     return buttons_list
@@ -100,6 +129,3 @@ async def handle_shop_steps(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 service.add(item)
                 await update.message.reply_text("Shopping item added. ✅")
             return ConversationHandler.END
-
-
-# TODO: delete and complete

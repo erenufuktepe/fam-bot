@@ -93,7 +93,15 @@ def build_shop_handler() -> ConversationHandler:
                 MessageHandler(
                     filters.TEXT & ~filters.COMMAND,
                     shop.handle_shop_steps,
-                )
+                ),
+                CallbackQueryHandler(
+                    shop.handle_shop_list_menu,
+                    pattern=r"^shop:(delete)(:\d+)?$",
+                ),
+                CallbackQueryHandler(
+                    shop.handle_shop_list_menu,
+                    pattern=r"^shop:(complete)$",
+                ),
             ],
         },
         fallbacks=[],
